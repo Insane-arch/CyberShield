@@ -17,29 +17,28 @@ public class Main {
         network.connect(3, 4);
         network.connect(4, 5);
 
-        System.out.println("\nComputer states:");
+        // Start the simulation with Computer 1 compromised.
+        network.getComputer(1).compromise();
+
+        SequentialSimulator simulator =
+                new SequentialSimulator(network);
+
+        System.out.println("\nInitial compromised computers: "
+                + simulator.getCompromisedCount());
+
+        for (int step = 1; step <= 3; step++) {
+            int newCases = simulator.runStep();
+
+            System.out.println("Step " + step
+                    + " | Newly compromised: " + newCases
+                    + " | Total compromised: "
+                    + simulator.getCompromisedCount());
+        }
+
+        System.out.println("\nFinal computer states:");
 
         for (int id = 1; id <= network.getSize(); id++) {
             System.out.println(network.getComputer(id));
-        }
-
-        System.out.println("\nConnections: 1 = connected, 0 = no connection");
-
-        System.out.print("    ");
-        for (int id = 1; id <= network.getSize(); id++) {
-            System.out.printf("%3d", id);
-        }
-        System.out.println();
-
-        for (int row = 1; row <= network.getSize(); row++) {
-            System.out.printf("%3d ", row);
-
-            for (int column = 1; column <= network.getSize(); column++) {
-                int value = network.areConnected(row, column) ? 1 : 0;
-                System.out.printf("%3d", value);
-            }
-
-            System.out.println();
         }
     }
 }
