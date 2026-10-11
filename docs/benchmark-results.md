@@ -49,5 +49,6 @@ This comparison does not isolate the effect of network size alone.
 ## Limitations
 Results describe these benchmark sessions, not guaranteed performance.
 The three scenarios have unequal workloads.
-Hardware details still need to be recorded.
+Hardware and software details are recorded in benchmark-environment.md.
+Power conditions and background activity were not recorded.
 Additional sessions may produce different timings.
