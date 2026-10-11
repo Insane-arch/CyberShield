@@ -6,32 +6,36 @@ package cybershield;
 
 public class ParallelComparison {
 
-    private static Network createNetwork(int scenario) {
-        Network network = new Network(5);
-
-        network.connect(1, 2);
-        network.connect(1, 3);
-        network.connect(2, 4);
-        network.connect(3, 4);
-        network.connect(4, 5);
-
-        network.getComputer(1).compromise();
-
-        if (scenario == 1) {
-            network.getComputer(1).isolate();
-        } else if (scenario == 2) {
-            network.getComputer(4).protect();
-        }
-
-        return network;
-    }
-
     public static void main(String[] args)
             throws InterruptedException {
 
-        System.out.println("CyberShield - Sequential vs Threaded");
+        int workerCount = 3;
+
+        if (args.length > 1) {
+            System.out.println(
+                    "Usage: java -cp out cybershield.ParallelComparison"
+                    + " [workers]");
+            return;
+        }
+
+        if (args.length == 1) {
+            try {
+                workerCount = Integer.parseInt(args[0]);
+            } catch (NumberFormatException exception) {
+                System.out.println("Worker count must be 1, 2, or 3.");
+                return;
+            }
+        }
+
+        if (workerCount < 1 || workerCount > 3) {
+            System.out.println("Worker count must be 1, 2, or 3.");
+            return;
+        }
+
+        System.out.println("CyberShield - Worker Count Comparison");
         System.out.println("Muhammad Hamza Naseer - 247121");
         System.out.println("Sultan Majeed - 247187");
+        System.out.println("\nWorker threads: " + workerCount);
 
         String[] names = {
             "No defence",
@@ -39,49 +43,64 @@ public class ParallelComparison {
             "Protect Computer 4"
         };
 
+        int[] scenarios = {
+            NetworkFactory.NO_DEFENCE,
+            NetworkFactory.ISOLATION,
+            NetworkFactory.PROTECTION
+        };
+
         int steps = 3;
-        int[] sequentialResults = new int[names.length];
+        int[] sequentialResults = new int[scenarios.length];
 
-        // Run each scenario sequentially on a fresh network.
-        for (int i = 0; i < names.length; i++) {
-            ScenarioTask task =
-                    new ScenarioTask(NetworkFactory.createScenario(i), steps);
+        // Sequential baseline.
+        for (int i = 0; i < scenarios.length; i++) {
+            Network network =
+                    NetworkFactory.createScenario(scenarios[i]);
 
+            ScenarioTask task = new ScenarioTask(network, steps);
             task.run();
+
             sequentialResults[i] = task.getCompromisedCount();
         }
 
-        ScenarioTask[] tasks = new ScenarioTask[names.length];
-        Thread[] threads = new Thread[names.length];
+        // Fresh tasks for worker execution.
+        ScenarioTask[] tasks = new ScenarioTask[scenarios.length];
 
-        // Create a separate task and network for each thread.
-        for (int i = 0; i < names.length; i++) {
-            tasks[i] = new ScenarioTask(createNetwork(i), steps);
-            threads[i] = new Thread(tasks[i], "Scenario-" + i);
+        for (int i = 0; i < scenarios.length; i++) {
+            Network network =
+                    NetworkFactory.createScenario(scenarios[i]);
+
+            tasks[i] = new ScenarioTask(network, steps);
         }
 
-        // Start every thread before waiting for any of them.
+        Thread[] threads = new Thread[workerCount];
+
+        for (int i = 0; i < workerCount; i++) {
+            ScenarioWorker worker =
+                    new ScenarioWorker(tasks, i, workerCount);
+
+            threads[i] = new Thread(worker, "Worker-" + i);
+        }
+
         for (int i = 0; i < threads.length; i++) {
             threads[i].start();
         }
 
-        // Wait for all worker threads to finish.
         for (int i = 0; i < threads.length; i++) {
             threads[i].join();
         }
 
-        System.out.println("\nFinal compromised totals:");
         System.out.printf(
-                "%-22s %12s %12s %10s%n",
+                "%n%-22s %12s %12s %8s%n",
                 "Scenario", "Sequential", "Threaded", "Match");
 
-        for (int i = 0; i < names.length; i++) {
+        for (int i = 0; i < scenarios.length; i++) {
             int threadedResult = tasks[i].getCompromisedCount();
             boolean matches =
                     sequentialResults[i] == threadedResult;
 
             System.out.printf(
-                    "%-22s %12d %12d %10s%n",
+                    "%-22s %12d %12d %8s%n",
                     names[i],
                     sequentialResults[i],
                     threadedResult,
