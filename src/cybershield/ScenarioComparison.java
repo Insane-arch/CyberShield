@@ -60,13 +60,14 @@ public class ScenarioComparison {
 
         int steps = 3;
 
-        Network baseline = createNetwork();
+        Network baseline =
+            NetworkFactory.createScenario(NetworkFactory.NO_DEFENCE);
 
-        Network isolation = createNetwork();
-        isolation.getComputer(1).isolate();
+        Network isolation =
+            NetworkFactory.createScenario(NetworkFactory.ISOLATION);
 
-        Network protection = createNetwork();
-        protection.getComputer(4).protect();
+        Network protection =
+            NetworkFactory.createScenario(NetworkFactory.PROTECTION);
 
         System.out.println("\nComputers: 5 | Steps per scenario: " + steps);
         System.out.println("Initially compromised computer: 1");

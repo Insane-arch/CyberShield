@@ -45,7 +45,7 @@ public class ParallelComparison {
         // Run each scenario sequentially on a fresh network.
         for (int i = 0; i < names.length; i++) {
             ScenarioTask task =
-                    new ScenarioTask(createNetwork(i), steps);
+                    new ScenarioTask(NetworkFactory.createScenario(i), steps);
 
             task.run();
             sequentialResults[i] = task.getCompromisedCount();

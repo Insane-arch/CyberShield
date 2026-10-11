@@ -9,16 +9,8 @@ public class Main {
         System.out.println("Muhammad Hamza Naseer - 247121");
         System.out.println("Sultan Majeed - 247187");
 
-        Network network = new Network(5);
-
-        network.connect(1, 2);
-        network.connect(1, 3);
-        network.connect(2, 4);
-        network.connect(3, 4);
-        network.connect(4, 5);
-
-        // Start the simulation with Computer 1 compromised.
-        network.getComputer(1).compromise();
+        Network network =
+            NetworkFactory.createScenario(NetworkFactory.NO_DEFENCE);
 
         SequentialSimulator simulator =
                 new SequentialSimulator(network);
