@@ -60,13 +60,8 @@ public class ForkJoinDemo {
         SimulationBatchTask batch = new SimulationBatchTask(
                 forkJoinTasks, 0, forkJoinTasks.length, threshold);
 
-        ForkJoinPool pool = new ForkJoinPool(parallelism);
-
-        try {
-            // Wait until the entire batch has completed.
+        try (ForkJoinPool pool = new ForkJoinPool(parallelism)) {
             pool.invoke(batch);
-        } finally {
-            pool.shutdown();
         }
 
         String[] names = {

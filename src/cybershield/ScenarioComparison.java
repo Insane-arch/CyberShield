@@ -6,19 +6,6 @@ package cybershield;
 
 public class ScenarioComparison {
 
-    private static Network createNetwork() {
-        Network network = new Network(5);
-
-        network.connect(1, 2);
-        network.connect(1, 3);
-        network.connect(2, 4);
-        network.connect(3, 4);
-        network.connect(4, 5);
-
-        network.getComputer(1).compromise();
-
-        return network;
-    }
 
     private static void runScenario(
             String name, Network network, int steps) {
