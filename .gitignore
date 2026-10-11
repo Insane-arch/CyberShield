@@ -1,0 +1,23 @@
+# Compiled Java files
+*.class
+
+# Build output
+bin/
+out/
+target/
+build/
+
+# Local IDE settings
+.vscode/
+.idea/
+*.iml
+
+# Runtime logs
+*.log
+
+# Local environment files
+.env
+
+# Windows metadata
+Thumbs.db
+Desktop.ini
