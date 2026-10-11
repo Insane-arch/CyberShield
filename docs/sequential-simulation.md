@@ -41,5 +41,20 @@ Expected results:
 Propagation probabilities, automatic containment strategies,
 multithreading, and distributed execution are not implemented yet.
 
-This demonstration checks propagation timing and avoids duplicate
-counting. Protection and isolation behaviour require separate checks.
+The main demonstration checks propagation timing and duplicate counting.
+
+## Containment Checks
+SimulationChecks uses a fresh three-computer chain for each case.
+Computer 1 starts compromised, with connections 1-2 and 2-3.
+
+Three cases are checked:
+1. Isolate Computer 1 to check that outgoing spread is blocked.
+2. Isolate Computer 2 to check that incoming spread is blocked.
+3. Protect Computer 2 to check that new compromise is blocked.
+
+Each case runs for two steps. Both steps must produce zero new
+compromises. Computer 1 must remain compromised, while Computers
+2 and 3 remain healthy.
+
+An unexpected result throws AssertionError.
+These checks cover the initial deterministic containment rules.
