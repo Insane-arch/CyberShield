@@ -54,4 +54,4 @@ The scenarios have unequal workloads, limiting load balance.
 These results describe this workload and machine.
 
 Only final compromised totals are compared for correctness.
-The benchmark does not validate every intermediate state.
+The benchmark does not validate every intermediate state.   
