@@ -46,7 +46,8 @@ The table compares final compromised totals for each scenario.
 A mismatch throws AssertionError.
 
 This checks agreement of final counts, not every intermediate state.
-Execution time and speedup are not measured yet.
+Elapsed time is measured as described below.
+Speedup is not calculated yet.
 
 ## Expected Results
 With 6 computers and 5 steps:
@@ -66,3 +67,27 @@ The topology is a chain, not a randomly generated network.
 A sufficiently small step count may stop before spread finishes.
 The adjacency matrix requires quadratic memory, so use modest sizes
 during these initial demonstrations.
+
+## Initial Timing Measurement
+System.nanoTime() measures elapsed time for each execution mode.
+Nanoseconds are converted to milliseconds for display.
+
+Both measurements include:
+- Network construction.
+- Task construction and simulation execution.
+- Result collection.
+
+The threaded measurement also includes thread creation, startup,
+and waiting for completion.
+
+Console output and result comparison are outside the timed sections.
+
+These are single-run measurements without warm-up.
+JVM startup effects, compilation, garbage collection, and operating
+system scheduling can influence the readings.
+
+Sequential execution always runs first in this initial version.
+The three scenarios also have unequal workloads.
+
+These readings are exploratory. Repeated measurements and warm-up
+are required before reporting performance conclusions.

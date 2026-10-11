@@ -61,9 +61,11 @@ public class ConfigurableComparison {
             NetworkFactory.PROTECTION
         };
 
+        // 1. Sequential execution and timing.
+        long sequentialStart = System.nanoTime();
+
         int[] sequentialResults = new int[scenarios.length];
 
-        // First, execute the scenarios one after another.
         for (int i = 0; i < scenarios.length; i++) {
             Network network =
                     NetworkFactory.createChainScenario(size, scenarios[i]);
@@ -74,10 +76,14 @@ public class ConfigurableComparison {
             sequentialResults[i] = task.getCompromisedCount();
         }
 
+        long sequentialNanos = System.nanoTime() - sequentialStart;
+
+        // 2. Threaded execution and timing.
+        long threadedStart = System.nanoTime();
+
         ScenarioTask[] tasks = new ScenarioTask[scenarios.length];
         Thread[] threads = new Thread[scenarios.length];
 
-        // Create fresh networks for the threaded execution.
         for (int i = 0; i < scenarios.length; i++) {
             Network network =
                     NetworkFactory.createChainScenario(size, scenarios[i]);
@@ -86,22 +92,29 @@ public class ConfigurableComparison {
             threads[i] = new Thread(tasks[i], "Scenario-" + i);
         }
 
-        // Start every worker before waiting.
         for (int i = 0; i < threads.length; i++) {
             threads[i].start();
         }
 
-        // Read results only after all workers finish.
         for (int i = 0; i < threads.length; i++) {
             threads[i].join();
         }
 
+        int[] threadedResults = new int[scenarios.length];
+
+        for (int i = 0; i < tasks.length; i++) {
+            threadedResults[i] = tasks[i].getCompromisedCount();
+        }
+
+        long threadedNanos = System.nanoTime() - threadedStart;
+
+        // 3. Compare and display results outside the timed sections.
         System.out.printf(
                 "%n%-26s %12s %12s %8s%n",
                 "Scenario", "Sequential", "Threaded", "Match");
 
         for (int i = 0; i < scenarios.length; i++) {
-            int threadedResult = tasks[i].getCompromisedCount();
+            int threadedResult = threadedResults[i];
             boolean matches =
                     sequentialResults[i] == threadedResult;
 
@@ -119,5 +132,20 @@ public class ConfigurableComparison {
         }
 
         System.out.println("\nAll scenario totals match.");
+
+        double sequentialMillis = sequentialNanos / 1_000_000.0;
+        double threadedMillis = threadedNanos / 1_000_000.0;
+
+        System.out.printf(
+                "%nSequential elapsed time: %.3f ms%n",
+                sequentialMillis);
+
+        System.out.printf(
+                "Threaded elapsed time:   %.3f ms%n",
+                threadedMillis);
+
+        System.out.println(
+                "Single-run measurements;"
+                + " performance conclusions require repeated runs.");
     }
 }
