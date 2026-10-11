@@ -6,7 +6,9 @@ package cybershield;
 
 public class ConfigurableComparison {
 
-    public static void main(String[] args) {
+    public static void main(String[] args)
+            throws InterruptedException {
+
         int size = 6;
         int steps = 5;
 
@@ -59,22 +61,63 @@ public class ConfigurableComparison {
             NetworkFactory.PROTECTION
         };
 
-        System.out.printf(
-                "%n%-26s %12s%n", "Scenario", "Compromised");
+        int[] sequentialResults = new int[scenarios.length];
 
+        // First, execute the scenarios one after another.
         for (int i = 0; i < scenarios.length; i++) {
             Network network =
                     NetworkFactory.createChainScenario(size, scenarios[i]);
 
             ScenarioTask task = new ScenarioTask(network, steps);
-
-            // Direct call: this comparison is sequential.
             task.run();
 
-            System.out.printf(
-                    "%-26s %12d%n",
-                    names[i],
-                    task.getCompromisedCount());
+            sequentialResults[i] = task.getCompromisedCount();
         }
+
+        ScenarioTask[] tasks = new ScenarioTask[scenarios.length];
+        Thread[] threads = new Thread[scenarios.length];
+
+        // Create fresh networks for the threaded execution.
+        for (int i = 0; i < scenarios.length; i++) {
+            Network network =
+                    NetworkFactory.createChainScenario(size, scenarios[i]);
+
+            tasks[i] = new ScenarioTask(network, steps);
+            threads[i] = new Thread(tasks[i], "Scenario-" + i);
+        }
+
+        // Start every worker before waiting.
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].start();
+        }
+
+        // Read results only after all workers finish.
+        for (int i = 0; i < threads.length; i++) {
+            threads[i].join();
+        }
+
+        System.out.printf(
+                "%n%-26s %12s %12s %8s%n",
+                "Scenario", "Sequential", "Threaded", "Match");
+
+        for (int i = 0; i < scenarios.length; i++) {
+            int threadedResult = tasks[i].getCompromisedCount();
+            boolean matches =
+                    sequentialResults[i] == threadedResult;
+
+            System.out.printf(
+                    "%-26s %12d %12d %8s%n",
+                    names[i],
+                    sequentialResults[i],
+                    threadedResult,
+                    matches ? "YES" : "NO");
+
+            if (!matches) {
+                throw new AssertionError(
+                        "Result mismatch for " + names[i]);
+            }
+        }
+
+        System.out.println("\nAll scenario totals match.");
     }
 }
