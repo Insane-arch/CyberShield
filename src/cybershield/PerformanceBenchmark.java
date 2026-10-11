@@ -9,7 +9,8 @@ import java.util.Arrays;
 public class PerformanceBenchmark {
 
     private static long measureRun(
-            boolean threaded, int size, int steps, int[] results)
+            boolean threaded, int size, int steps,
+            int workerCount, int[] results)
             throws InterruptedException {
 
         int[] scenarios = {
@@ -30,10 +31,13 @@ public class PerformanceBenchmark {
         }
 
         if (threaded) {
-            Thread[] threads = new Thread[tasks.length];
+            Thread[] threads = new Thread[workerCount];
 
             for (int i = 0; i < threads.length; i++) {
-                threads[i] = new Thread(tasks[i], "Benchmark-" + i);
+                ScenarioWorker worker =
+                        new ScenarioWorker(tasks, i, workerCount);
+
+                threads[i] = new Thread(worker, "Benchmark-" + i);
             }
 
             for (int i = 0; i < threads.length; i++) {
@@ -61,28 +65,41 @@ public class PerformanceBenchmark {
 
         int size = 100;
         int steps = 99;
+        int workerCount = 3;
 
-        if (args.length != 0 && args.length != 2) {
+        if (args.length != 0
+                && args.length != 2
+                && args.length != 3) {
+
             System.out.println(
                     "Usage: java -cp out cybershield.PerformanceBenchmark"
-                    + " [size steps]");
+                    + " [size steps [workers]]");
             return;
         }
 
-        if (args.length == 2) {
-            try {
+        try {
+            if (args.length >= 2) {
                 size = Integer.parseInt(args[0]);
                 steps = Integer.parseInt(args[1]);
-            } catch (NumberFormatException exception) {
-                System.out.println(
-                        "Enter whole numbers within the Java int range.");
-                return;
             }
+
+            if (args.length == 3) {
+                workerCount = Integer.parseInt(args[2]);
+            }
+        } catch (NumberFormatException exception) {
+            System.out.println(
+                    "Enter whole numbers within the Java int range.");
+            return;
         }
 
         if (size < 3 || steps < 0) {
             System.out.println(
                     "Size must be at least 3. Steps cannot be negative.");
+            return;
+        }
+
+        if (workerCount < 1 || workerCount > 3) {
+            System.out.println("Worker count must be 1, 2, or 3.");
             return;
         }
 
@@ -98,7 +115,7 @@ public class PerformanceBenchmark {
 
         System.out.println("\nComputers: " + size);
         System.out.println("Steps: " + steps);
-        System.out.println("Worker threads: 3");
+        System.out.println("Worker threads: " + workerCount);
         System.out.println("Warm-up runs per mode: " + warmupRuns);
         System.out.println("Measured runs per mode: " + measuredRuns);
         System.out.println("\nWarming up both execution modes...");
@@ -113,22 +130,20 @@ public class PerformanceBenchmark {
             long sequentialNanos;
             long threadedNanos;
 
-            // Alternate execution order to reduce order bias.
             if (round % 2 == 0) {
-                sequentialNanos =
-                        measureRun(false, size, steps, sequentialResults);
+                sequentialNanos = measureRun(
+                        false, size, steps, workerCount, sequentialResults);
 
-                threadedNanos =
-                        measureRun(true, size, steps, threadedResults);
+                threadedNanos = measureRun(
+                        true, size, steps, workerCount, threadedResults);
             } else {
-                threadedNanos =
-                        measureRun(true, size, steps, threadedResults);
+                threadedNanos = measureRun(
+                        true, size, steps, workerCount, threadedResults);
 
-                sequentialNanos =
-                        measureRun(false, size, steps, sequentialResults);
+                sequentialNanos = measureRun(
+                        false, size, steps, workerCount, sequentialResults);
             }
 
-            // Correctness checks happen outside the timed sections.
             if (!Arrays.equals(sequentialResults, threadedResults)) {
                 throw new AssertionError(
                         "Sequential and threaded totals do not match.");
@@ -161,7 +176,9 @@ public class PerformanceBenchmark {
 
         double sequentialAverage = sequentialTotal / measuredRuns;
         double threadedAverage = threadedTotal / measuredRuns;
+
         double speedup = sequentialAverage / threadedAverage;
+        double efficiency = speedup / workerCount * 100.0;
 
         System.out.println("\nAll scenario totals matched in every run.");
 
@@ -171,7 +188,7 @@ public class PerformanceBenchmark {
         System.out.printf(
                 "Average threaded time:   %.3f ms%n", threadedAverage);
 
-        System.out.printf(
-                "Speedup: %.2fx%n", speedup);
+        System.out.printf("Speedup: %.2fx%n", speedup);
+        System.out.printf("Efficiency: %.2f%%%n", efficiency);
     }
 }
