@@ -33,4 +33,33 @@ public class NetworkFactory {
 
         return network;
     }
+    
+    public static Network createChainScenario(int size, int scenario) {
+        if (size < 3) {
+            throw new IllegalArgumentException(
+                    "Chain network must contain at least 3 computers.");
+        }
+
+        if (scenario < NO_DEFENCE || scenario > PROTECTION) {
+            throw new IllegalArgumentException(
+                    "Invalid scenario: " + scenario);
+        }
+
+        Network network = new Network(size);
+
+        for (int id = 1; id < size; id++) {
+            network.connect(id, id + 1);
+        }
+
+        network.getComputer(1).compromise();
+
+        if (scenario == ISOLATION) {
+            network.getComputer(1).isolate();
+        } else if (scenario == PROTECTION) {
+            int protectedId = size / 2 + 1;
+            network.getComputer(protectedId).protect();
+        }
+
+        return network;
+    }
 }
