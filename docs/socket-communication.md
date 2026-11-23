@@ -53,3 +53,13 @@ Read timeouts do not limit simulation computation time.
 Sockets and streams are closed using try-with-resources.
 Automatic retry and distributed performance measurement are not
 implemented.
+
+## Execution Screenshots
+
+![Worker receiving a task and returning its result](screenshots/socket-worker.png)
+
+Figure 1: The worker processes the simulation task and returns its result.
+
+![Coordinator comparing local and worker results](screenshots/socket-coordinator.png)
+
+Figure 2: The coordinator verifies that both executions return 50 compromised computers.
