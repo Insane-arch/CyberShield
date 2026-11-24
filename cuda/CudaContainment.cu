@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-constexpr int COMPUTER_COUNT = 8;
-
 void checkCuda(cudaError_t result, const char* operation) {
     if (result != cudaSuccess) {
         std::fprintf(stderr, "%s failed: %s\n",
@@ -19,24 +17,35 @@ void checkCuda(cudaError_t result, const char* operation) {
     }
 }
 
-int parseSteps(const char* argument) {
+int parseNumber(
+    const char* argument,
+    int minimum,
+    int maximum,
+    const char* name
+) {
     std::string text(argument);
+    std::string message =
+        std::string(name) + " must be a whole number from " +
+        std::to_string(minimum) + " to " + std::to_string(maximum) + ".";
 
     if (text.empty() ||
         text.find_first_not_of("0123456789") != std::string::npos) {
-        throw std::invalid_argument(
-            "Steps must be a whole number from 0 to 10000.");
+        throw std::invalid_argument(message);
     }
 
-    // Also rejects numbers too large to fit in an int.
-    int steps = std::stoi(text);
+    int value;
 
-    if (steps > 10000) {
-        throw std::invalid_argument(
-            "Steps must be a whole number from 0 to 10000.");
+    try {
+        value = std::stoi(text);
+    } catch (const std::out_of_range&) {
+        throw std::invalid_argument(message);
     }
 
-    return steps;
+    if (value < minimum || value > maximum) {
+        throw std::invalid_argument(message);
+    }
+
+    return value;
 }
 
 __global__ void spreadOneStep(
@@ -77,22 +86,21 @@ __global__ void spreadOneStep(
     next[index] = receivesAttack ? 1 : 0;
 }
 
-// Independent expected result for this specific scenario family:
-// a chain, initially compromised Computer 1, and at most one
-// isolation target and one protection target.
+// Expected states for a chain initially compromised at Computer 1.
 std::vector<int> expectedStates(
+    int count,
     int steps,
     int isolatedComputer,
     int protectedComputer
 ) {
-    std::vector<int> expected(COMPUTER_COUNT, 0);
+    std::vector<int> expected(count, 0);
     expected[0] = 1;
 
     if (isolatedComputer == 1) {
         return expected;
     }
 
-    int lastReachable = COMPUTER_COUNT;
+    int lastReachable = count;
 
     if (isolatedComputer > 1 &&
         isolatedComputer - 1 < lastReachable) {
@@ -114,22 +122,23 @@ std::vector<int> expectedStates(
 }
 
 bool runScenario(
-    const char* name,
+    const std::string& name,
     int isolatedComputer,
     int protectedComputer,
+    int count,
     int steps
 ) {
-    constexpr size_t bytes = COMPUTER_COUNT * sizeof(int);
-
-    if (isolatedComputer < 0 || isolatedComputer > COMPUTER_COUNT ||
-        protectedComputer < 0 || protectedComputer > COMPUTER_COUNT) {
+    if (isolatedComputer < 0 || isolatedComputer > count ||
+        protectedComputer < 0 || protectedComputer > count) {
         throw std::invalid_argument("Invalid defence computer ID.");
     }
 
-    std::vector<int> initial(COMPUTER_COUNT, 0);
-    std::vector<int> isolated(COMPUTER_COUNT, 0);
-    std::vector<int> protectedNodes(COMPUTER_COUNT, 0);
-    std::vector<int> gpuResult(COMPUTER_COUNT, 0);
+    size_t bytes = static_cast<size_t>(count) * sizeof(int);
+
+    std::vector<int> initial(count, 0);
+    std::vector<int> isolated(count, 0);
+    std::vector<int> protectedNodes(count, 0);
+    std::vector<int> gpuResult(count, 0);
 
     initial[0] = 1;
 
@@ -142,7 +151,7 @@ bool runScenario(
     }
 
     std::vector<int> expected =
-        expectedStates(steps, isolatedComputer, protectedComputer);
+        expectedStates(count, steps, isolatedComputer, protectedComputer);
 
     std::vector<int> cpuResult =
         simulateCpu(initial, isolated, protectedNodes, steps);
@@ -181,16 +190,12 @@ bool runScenario(
               "Copy protection flags");
 
     constexpr int threadsPerBlock = 128;
-    int blocks =
-        (COMPUTER_COUNT + threadsPerBlock - 1) / threadsPerBlock;
+    int blocks = (count + threadsPerBlock - 1) / threadsPerBlock;
 
     for (int step = 0; step < steps; ++step) {
         spreadOneStep<<<blocks, threadsPerBlock>>>(
-            deviceCurrent,
-            deviceNext,
-            deviceIsolated,
-            deviceProtected,
-            COMPUTER_COUNT);
+            deviceCurrent, deviceNext,
+            deviceIsolated, deviceProtected, count);
 
         checkCuda(cudaGetLastError(), "Launch propagation kernel");
         checkCuda(cudaDeviceSynchronize(), "Complete propagation step");
@@ -200,7 +205,6 @@ bool runScenario(
         deviceNext = temporary;
     }
 
-    // With zero steps, deviceCurrent still contains the initial states.
     checkCuda(cudaMemcpy(gpuResult.data(), deviceCurrent, bytes,
                          cudaMemcpyDeviceToHost),
               "Copy final states");
@@ -216,22 +220,21 @@ bool runScenario(
 
     int cpuTotal =
         std::accumulate(cpuResult.begin(), cpuResult.end(), 0);
-
     int gpuTotal =
         std::accumulate(gpuResult.begin(), gpuResult.end(), 0);
 
-    std::printf("%-24s %6d %6d %8s %10s\n",
-                name, cpuTotal, gpuTotal,
+    std::printf("%-26s %8d %8d %8s %10s\n",
+                name.c_str(), cpuTotal, gpuTotal,
                 match ? "YES" : "NO",
                 expectedMatch ? "PASS" : "FAIL");
 
-    for (int i = 0; i < COMPUTER_COUNT; ++i) {
+    for (int i = 0; i < count; ++i) {
         if (cpuResult[i] != expected[i] ||
             gpuResult[i] != expected[i]) {
             std::fprintf(
                 stderr,
                 "%s: Computer %d | CPU=%d GPU=%d Expected=%d\n",
-                name, i + 1,
+                name.c_str(), i + 1,
                 cpuResult[i], gpuResult[i], expected[i]);
         }
     }
@@ -245,26 +248,44 @@ int main(int argc, char* argv[]) {
     std::printf("Sultan Majeed - 247187\n\n");
 
     try {
-        if (argc > 2) {
+        if (argc > 3) {
             throw std::invalid_argument(
-                "Usage: CudaContainment.exe [steps]");
+                "Usage: CudaContainment.exe [steps] [computers]");
         }
 
-        int steps = argc == 2 ? parseSteps(argv[1]) : 7;
+        int steps = argc >= 2
+            ? parseNumber(argv[1], 0, 10000, "Steps") : 7;
 
-        std::printf("Computers: %d\n", COMPUTER_COUNT);
+        int count = argc == 3
+            ? parseNumber(argv[2], 3, 10000, "Computers") : 8;
+
+        // Lower middle for even sizes, preserving Computer 4 for size 8.
+        int middle = (count + 1) / 2;
+
+        std::printf("Computers: %d\n", count);
         std::printf("Simulation steps: %d\n", steps);
-        std::printf("Initially compromised: Computer 1\n\n");
+        std::printf("Initially compromised: Computer 1\n");
+        std::printf("Middle defence target: Computer %d\n\n", middle);
 
-        std::printf("%-24s %6s %6s %8s %10s\n",
+        std::printf("%-26s %8s %8s %8s %10s\n",
                     "Scenario", "CPU", "GPU", "Match", "Expected");
 
-        bool baseline = runScenario("No defence", 0, 0, steps);
-        bool source = runScenario("Isolate Computer 1", 1, 0, steps);
-        bool middle = runScenario("Isolate Computer 4", 4, 0, steps);
-        bool protection = runScenario("Protect Computer 4", 0, 4, steps);
+        bool baseline = runScenario(
+            "No defence", 0, 0, count, steps);
 
-        bool passed = baseline && source && middle && protection;
+        bool source = runScenario(
+            "Isolate Computer 1", 1, 0, count, steps);
+
+        bool middleIsolation = runScenario(
+            "Isolate Computer " + std::to_string(middle),
+            middle, 0, count, steps);
+
+        bool protection = runScenario(
+            "Protect Computer " + std::to_string(middle),
+            0, middle, count, steps);
+
+        bool passed =
+            baseline && source && middleIsolation && protection;
 
         std::printf("\n%s\n",
                     passed
@@ -272,9 +293,6 @@ int main(int argc, char* argv[]) {
                         : "CPU/GPU verification failed.");
 
         return passed ? EXIT_SUCCESS : EXIT_FAILURE;
-    } catch (const std::out_of_range&) {
-        std::fprintf(stderr, "Error: Steps must be between 0 and 10000.\n");
-        return EXIT_FAILURE;
     } catch (const std::exception& error) {
         std::fprintf(stderr, "Error: %s\n", error.what());
         return EXIT_FAILURE;
