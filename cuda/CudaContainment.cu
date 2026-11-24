@@ -10,8 +10,6 @@ void checkCuda(cudaError_t result, const char* operation) {
     }
 }
 
-// An isolated computer cannot send or receive the attack.
-// Each thread writes one next-state value.
 __global__ void spreadOneStep(
     const int* current,
     int* next,
@@ -24,7 +22,6 @@ __global__ void spreadOneStep(
         return;
     }
 
-    // Existing compromises persist, including on isolated computers.
     next[index] = current[index];
 
     if (current[index] != 0 || isolated[index] != 0) {
@@ -48,20 +45,28 @@ __global__ void spreadOneStep(
     next[index] = receivesAttack ? 1 : 0;
 }
 
-int main() {
-    std::printf("CyberShield - CUDA Containment: Isolation\n");
-    std::printf("Muhammad Hamza Naseer - 247121\n");
-    std::printf("Sultan Majeed - 247187\n\n");
-
+bool runScenario(
+    const char* name,
+    int isolatedComputer,
+    const int* expected
+) {
     constexpr int count = 8;
     constexpr int steps = 7;
     constexpr size_t bytes = count * sizeof(int);
 
     int initial[count] = {1, 0, 0, 0, 0, 0, 0, 0};
-    int isolated[count] = {1, 0, 0, 0, 0, 0, 0, 0};
+    int isolated[count] = {};
     int result[count] = {};
 
-    const int expected[count] = {1, 0, 0, 0, 0, 0, 0, 0};
+    // Zero means no isolation; otherwise use a one-based computer ID.
+    if (isolatedComputer < 0 || isolatedComputer > count) {
+        std::fprintf(stderr, "Invalid isolated computer ID.\n");
+        return false;
+    }
+
+    if (isolatedComputer > 0) {
+        isolated[isolatedComputer - 1] = 1;
+    }
 
     int* deviceCurrent = nullptr;
     int* deviceNext = nullptr;
@@ -111,28 +116,66 @@ int main() {
     checkCuda(cudaFree(deviceIsolated), "Free isolation flags");
 
     bool passed = true;
-    int compromisedCount = 0;
-
-    std::printf("Computers: %d\n", count);
-    std::printf("Simulation steps: %d\n", steps);
-    std::printf("Isolated computer: 1\n\n");
-
-    std::printf("Computer   Initial   Isolated   Final   Expected\n");
+    int actualTotal = 0;
+    int expectedTotal = 0;
 
     for (int i = 0; i < count; ++i) {
-        std::printf("%8d %9d %10d %7d %10d\n",
-                    i + 1, initial[i], isolated[i],
-                    result[i], expected[i]);
-
-        compromisedCount += result[i];
+        actualTotal += result[i];
+        expectedTotal += expected[i];
 
         if (result[i] != expected[i]) {
             passed = false;
+            std::fprintf(
+                stderr,
+                "%s: Computer %d expected %d but received %d\n",
+                name, i + 1, expected[i], result[i]);
         }
     }
 
-    std::printf("\nCompromised computers: %d\n", compromisedCount);
-    std::printf("Verification: %s\n", passed ? "PASS" : "FAIL");
+    std::printf("%-24s %10d %10d %8s\n",
+                name, actualTotal, expectedTotal,
+                passed ? "PASS" : "FAIL");
 
-    return passed ? EXIT_SUCCESS : EXIT_FAILURE;
+    return passed;
+}
+
+int main() {
+    std::printf("CyberShield - CUDA Isolation Checks\n");
+    std::printf("Muhammad Hamza Naseer - 247121\n");
+    std::printf("Sultan Majeed - 247187\n\n");
+
+    std::printf("Computers: 8\n");
+    std::printf("Simulation steps: 7\n");
+    std::printf("Initially compromised: Computer 1\n\n");
+
+    const int noDefenceExpected[8] =
+        {1, 1, 1, 1, 1, 1, 1, 1};
+
+    const int sourceIsolationExpected[8] =
+        {1, 0, 0, 0, 0, 0, 0, 0};
+
+    const int middleIsolationExpected[8] =
+        {1, 1, 1, 0, 0, 0, 0, 0};
+
+    std::printf("%-24s %10s %10s %8s\n",
+                "Scenario", "GPU total", "Expected", "Check");
+
+    // Run every scenario, even if an earlier verification fails.
+    bool noDefencePassed =
+        runScenario("No defence", 0, noDefenceExpected);
+
+    bool sourcePassed =
+        runScenario("Isolate Computer 1", 1, sourceIsolationExpected);
+
+    bool middlePassed =
+        runScenario("Isolate Computer 4", 4, middleIsolationExpected);
+
+    bool allPassed = noDefencePassed && sourcePassed && middlePassed;
+
+    std::printf("\n%s\n",
+                allPassed
+                    ? "All 3 CUDA scenario checks passed."
+                    : "CUDA scenario verification failed.");
+
+    return allPassed ? EXIT_SUCCESS : EXIT_FAILURE;
 }
