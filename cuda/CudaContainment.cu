@@ -10,8 +10,8 @@ void checkCuda(cudaError_t result, const char* operation) {
     }
 }
 
-// Chain topology: each computer connects to its immediate neighbours.
-// Read only the current state; write each computer's next state separately.
+// Each GPU thread calculates one computer's next state.
+// Current states remain unchanged throughout the step.
 __global__ void spreadOneStep(
     const int* current,
     int* next,
@@ -37,16 +37,17 @@ __global__ void spreadOneStep(
 }
 
 int main() {
-    std::printf("CyberShield - CUDA Containment: One Step\n");
+    std::printf("CyberShield - CUDA Containment: Multiple Steps\n");
     std::printf("Muhammad Hamza Naseer - 247121\n");
     std::printf("Sultan Majeed - 247187\n\n");
 
     constexpr int count = 8;
+    constexpr int steps = 7;
     constexpr size_t bytes = count * sizeof(int);
 
     int initial[count] = {1, 0, 0, 0, 0, 0, 0, 0};
     int result[count] = {};
-    const int expected[count] = {1, 1, 0, 0, 0, 0, 0, 0};
+    const int expected[count] = {1, 1, 1, 1, 1, 1, 1, 1};
 
     int* deviceCurrent = nullptr;
     int* deviceNext = nullptr;
@@ -66,15 +67,22 @@ int main() {
     constexpr int threadsPerBlock = 128;
     int blocks = (count + threadsPerBlock - 1) / threadsPerBlock;
 
-    spreadOneStep<<<blocks, threadsPerBlock>>>(
-        deviceCurrent, deviceNext, count);
+    for (int step = 0; step < steps; ++step) {
+        spreadOneStep<<<blocks, threadsPerBlock>>>(
+            deviceCurrent, deviceNext, count);
 
-    checkCuda(cudaGetLastError(), "Launch propagation kernel");
-    checkCuda(cudaDeviceSynchronize(), "Complete propagation");
+        checkCuda(cudaGetLastError(), "Launch propagation kernel");
+        checkCuda(cudaDeviceSynchronize(), "Complete propagation step");
 
-    checkCuda(cudaMemcpy(result, deviceNext, bytes,
+        // Use the completed output as the next step's input.
+        int* temporary = deviceCurrent;
+        deviceCurrent = deviceNext;
+        deviceNext = temporary;
+    }
+
+    checkCuda(cudaMemcpy(result, deviceCurrent, bytes,
                          cudaMemcpyDeviceToHost),
-              "Copy next states");
+              "Copy final states");
 
     checkCuda(cudaFree(deviceCurrent), "Free current states");
     checkCuda(cudaFree(deviceNext), "Free next states");
@@ -82,7 +90,9 @@ int main() {
     bool passed = true;
     int compromisedCount = 0;
 
-    std::printf("Computer   Initial   After step   Expected\n");
+    std::printf("Computers: %d\n", count);
+    std::printf("Simulation steps: %d\n\n", steps);
+    std::printf("Computer   Initial   Final state   Expected\n");
 
     for (int i = 0; i < count; ++i) {
         std::printf("%8d %9d %12d %10d\n",
