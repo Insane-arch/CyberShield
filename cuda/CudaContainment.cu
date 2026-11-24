@@ -1,6 +1,11 @@
 #include <cuda_runtime.h>
+#include "CpuSimulation.h"
+
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
+#include <numeric>
+#include <vector>
 
 void checkCuda(cudaError_t result, const char* operation) {
     if (result != cudaSuccess) {
@@ -23,10 +28,8 @@ __global__ void spreadOneStep(
         return;
     }
 
-    // Neither isolation nor protection cures an existing compromise.
     next[index] = current[index];
 
-    // Isolation blocks receiving; protection blocks new compromise.
     if (current[index] != 0 ||
         isolated[index] != 0 ||
         protectedNodes[index] != 0) {
@@ -35,7 +38,6 @@ __global__ void spreadOneStep(
 
     bool receivesAttack = false;
 
-    // Isolation also blocks sending.
     if (index > 0 &&
         current[index - 1] != 0 &&
         isolated[index - 1] == 0) {
@@ -55,23 +57,25 @@ bool runScenario(
     const char* name,
     int isolatedComputer,
     int protectedComputer,
-    const int* expected
+    const std::vector<int>& expected
 ) {
     constexpr int count = 8;
     constexpr int steps = 7;
     constexpr size_t bytes = count * sizeof(int);
 
-    int initial[count] = {1, 0, 0, 0, 0, 0, 0, 0};
-    int isolated[count] = {};
-    int protectedNodes[count] = {};
-    int result[count] = {};
-
-    // Zero means no defence target; other IDs are one-based.
     if (isolatedComputer < 0 || isolatedComputer > count ||
-        protectedComputer < 0 || protectedComputer > count) {
-        std::fprintf(stderr, "Invalid defence computer ID.\n");
+        protectedComputer < 0 || protectedComputer > count ||
+        expected.size() != count) {
+        std::fprintf(stderr, "Invalid scenario configuration.\n");
         return false;
     }
+
+    std::vector<int> initial(count, 0);
+    std::vector<int> isolated(count, 0);
+    std::vector<int> protectedNodes(count, 0);
+    std::vector<int> gpuResult(count, 0);
+
+    initial[0] = 1;
 
     if (isolatedComputer > 0) {
         isolated[isolatedComputer - 1] = 1;
@@ -80,6 +84,10 @@ bool runScenario(
     if (protectedComputer > 0) {
         protectedNodes[protectedComputer - 1] = 1;
     }
+
+    // CPU starts from the same initial states and defence flags.
+    std::vector<int> cpuResult =
+        simulateCpu(initial, isolated, protectedNodes, steps);
 
     int* deviceCurrent = nullptr;
     int* deviceNext = nullptr;
@@ -102,15 +110,15 @@ bool runScenario(
         reinterpret_cast<void**>(&deviceProtected), bytes),
         "Allocate protection flags");
 
-    checkCuda(cudaMemcpy(deviceCurrent, initial, bytes,
+    checkCuda(cudaMemcpy(deviceCurrent, initial.data(), bytes,
                          cudaMemcpyHostToDevice),
               "Copy initial states");
 
-    checkCuda(cudaMemcpy(deviceIsolated, isolated, bytes,
+    checkCuda(cudaMemcpy(deviceIsolated, isolated.data(), bytes,
                          cudaMemcpyHostToDevice),
               "Copy isolation flags");
 
-    checkCuda(cudaMemcpy(deviceProtected, protectedNodes, bytes,
+    checkCuda(cudaMemcpy(deviceProtected, protectedNodes.data(), bytes,
                          cudaMemcpyHostToDevice),
               "Copy protection flags");
 
@@ -133,7 +141,7 @@ bool runScenario(
         deviceNext = temporary;
     }
 
-    checkCuda(cudaMemcpy(result, deviceCurrent, bytes,
+    checkCuda(cudaMemcpy(gpuResult.data(), deviceCurrent, bytes,
                          cudaMemcpyDeviceToHost),
               "Copy final states");
 
@@ -142,32 +150,38 @@ bool runScenario(
     checkCuda(cudaFree(deviceIsolated), "Free isolation flags");
     checkCuda(cudaFree(deviceProtected), "Free protection flags");
 
-    bool passed = true;
-    int actualTotal = 0;
-    int expectedTotal = 0;
+    // Compare complete state arrays, not only compromised totals.
+    bool match = cpuResult == gpuResult;
+    bool expectedMatch =
+        cpuResult == expected && gpuResult == expected;
+
+    int cpuTotal =
+        std::accumulate(cpuResult.begin(), cpuResult.end(), 0);
+
+    int gpuTotal =
+        std::accumulate(gpuResult.begin(), gpuResult.end(), 0);
+
+    std::printf("%-24s %6d %6d %8s %10s\n",
+                name, cpuTotal, gpuTotal,
+                match ? "YES" : "NO",
+                expectedMatch ? "PASS" : "FAIL");
 
     for (int i = 0; i < count; ++i) {
-        actualTotal += result[i];
-        expectedTotal += expected[i];
-
-        if (result[i] != expected[i]) {
-            passed = false;
+        if (cpuResult[i] != expected[i] ||
+            gpuResult[i] != expected[i]) {
             std::fprintf(
                 stderr,
-                "%s: Computer %d expected %d but received %d\n",
-                name, i + 1, expected[i], result[i]);
+                "%s: Computer %d | CPU=%d GPU=%d Expected=%d\n",
+                name, i + 1,
+                cpuResult[i], gpuResult[i], expected[i]);
         }
     }
 
-    std::printf("%-24s %10d %10d %8s\n",
-                name, actualTotal, expectedTotal,
-                passed ? "PASS" : "FAIL");
-
-    return passed;
+    return match && expectedMatch;
 }
 
 int main() {
-    std::printf("CyberShield - CUDA Defence Checks\n");
+    std::printf("CyberShield - CPU and CUDA Comparison\n");
     std::printf("Muhammad Hamza Naseer - 247121\n");
     std::printf("Sultan Majeed - 247187\n\n");
 
@@ -175,42 +189,36 @@ int main() {
     std::printf("Simulation steps: 7\n");
     std::printf("Initially compromised: Computer 1\n\n");
 
-    const int noDefenceExpected[8] =
-        {1, 1, 1, 1, 1, 1, 1, 1};
+    std::printf("%-24s %6s %6s %8s %10s\n",
+                "Scenario", "CPU", "GPU", "Match", "Expected");
 
-    const int sourceIsolationExpected[8] =
-        {1, 0, 0, 0, 0, 0, 0, 0};
+    try {
+        bool baseline = runScenario(
+            "No defence", 0, 0,
+            {1, 1, 1, 1, 1, 1, 1, 1});
 
-    const int middleDefenceExpected[8] =
-        {1, 1, 1, 0, 0, 0, 0, 0};
+        bool source = runScenario(
+            "Isolate Computer 1", 1, 0,
+            {1, 0, 0, 0, 0, 0, 0, 0});
 
-    std::printf("%-24s %10s %10s %8s\n",
-                "Scenario", "GPU total", "Expected", "Check");
+        bool middle = runScenario(
+            "Isolate Computer 4", 4, 0,
+            {1, 1, 1, 0, 0, 0, 0, 0});
 
-    bool noDefencePassed =
-        runScenario("No defence", 0, 0, noDefenceExpected);
+        bool protection = runScenario(
+            "Protect Computer 4", 0, 4,
+            {1, 1, 1, 0, 0, 0, 0, 0});
 
-    bool sourcePassed =
-        runScenario("Isolate Computer 1", 1, 0,
-                    sourceIsolationExpected);
+        bool passed = baseline && source && middle && protection;
 
-    bool middlePassed =
-        runScenario("Isolate Computer 4", 4, 0,
-                    middleDefenceExpected);
+        std::printf("\n%s\n",
+                    passed
+                        ? "All 4 CPU/GPU state comparisons passed."
+                        : "CPU/GPU verification failed.");
 
-    bool protectionPassed =
-        runScenario("Protect Computer 4", 0, 4,
-                    middleDefenceExpected);
-
-    bool allPassed = noDefencePassed &&
-                     sourcePassed &&
-                     middlePassed &&
-                     protectionPassed;
-
-    std::printf("\n%s\n",
-                allPassed
-                    ? "All 4 CUDA scenario checks passed."
-                    : "CUDA scenario verification failed.");
-
-    return allPassed ? EXIT_SUCCESS : EXIT_FAILURE;
+        return passed ? EXIT_SUCCESS : EXIT_FAILURE;
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "Error: %s\n", error.what());
+        return EXIT_FAILURE;
+    }
 }
