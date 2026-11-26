@@ -8,12 +8,9 @@ public class SimulationChecks {
 
     private static Network createNetwork() {
         Network network = new Network(3);
-
         network.connect(1, 2);
         network.connect(2, 3);
-
         network.getComputer(1).compromise();
-
         return network;
     }
 
@@ -102,8 +99,6 @@ public class SimulationChecks {
     private static void checkSharedTargetCountedOnce() {
         Network network = new Network(4);
 
-        // Sources 1 and 2 both connect to target 3.
-        // Computer 4 remains disconnected.
         network.connect(1, 3);
         network.connect(2, 3);
 
@@ -145,6 +140,57 @@ public class SimulationChecks {
                 "PASS: Multiple sources count a shared target only once");
     }
 
+    private static void checkProtectionDoesNotCureSource() {
+        Network network = createNetwork();
+
+        // Computer 1 is already compromised before protection is applied.
+        ComputerNode source = network.getComputer(1);
+        source.protect();
+
+        SequentialSimulator simulator =
+                new SequentialSimulator(network);
+
+        if (!source.isCompromised()
+                || !source.isProtected()
+                || source.isIsolated()) {
+            throw new AssertionError(
+                    "FAIL: Protection must preserve the compromised source");
+        }
+
+        int firstStep = simulator.runStep();
+
+        boolean firstStepCorrect = firstStep == 1
+                && simulator.getCompromisedCount() == 2
+                && source.isCompromised()
+                && source.isProtected()
+                && !source.isIsolated()
+                && network.getComputer(2).isCompromised()
+                && !network.getComputer(3).isCompromised();
+
+        if (!firstStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Protected compromised source must still spread");
+        }
+
+        int secondStep = simulator.runStep();
+
+        boolean secondStepCorrect = secondStep == 1
+                && simulator.getCompromisedCount() == 3
+                && source.isCompromised()
+                && source.isProtected()
+                && !source.isIsolated()
+                && network.getComputer(2).isCompromised()
+                && network.getComputer(3).isCompromised();
+
+        if (!secondStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Protection must not interrupt existing compromise");
+        }
+
+        System.out.println(
+                "PASS: Protection does not cure a compromised source");
+    }
+
     public static void main(String[] args) {
         System.out.println("CyberShield - Containment Checks");
         System.out.println("Muhammad Hamza Naseer - 247121");
@@ -168,7 +214,8 @@ public class SimulationChecks {
 
         checkOneConnectionPerStep();
         checkSharedTargetCountedOnce();
+        checkProtectionDoesNotCureSource();
 
-        System.out.println("\nAll 5 containment checks passed.");
+        System.out.println("\nAll 6 containment checks passed.");
     }
 }
