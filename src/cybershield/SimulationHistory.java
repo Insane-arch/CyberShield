@@ -4,12 +4,13 @@ package cybershield;
 // Muhammad Hamza Naseer - 247121
 // Sultan Majeed - 247187
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SimulationHistory {
 
-    // Each entry stores values, not references to mutable computers.
     public record HistoryEntry(
             int step,
             int newlyCompromised,
@@ -77,7 +78,6 @@ public class SimulationHistory {
                         "New-compromise count mismatch at step " + index);
             }
 
-            // Independent expectation for this specific chain scenario.
             int expectedTotal = Math.min(size, index + 1);
             int expectedNew =
                     index > 0 && index < size ? 1 : 0;
@@ -93,7 +93,16 @@ public class SimulationHistory {
     }
 
     public static void main(String[] args)
-            throws InterruptedException {
+            throws InterruptedException, IOException {
+
+        if (args.length > 1) {
+            throw new IllegalArgumentException(
+                    "Usage: SimulationHistory [output-directory]");
+        }
+
+        Path outputDirectory = args.length == 1
+                ? Path.of(args[0])
+                : Path.of("out", "history");
 
         int size = 7;
         int steps = 8;
@@ -121,7 +130,6 @@ public class SimulationHistory {
         int sequentialInitial = sequential.getCompromisedCount();
         int parallelInitial = parallel.getCompromisedCount();
 
-        // Step zero records the initial state, before any propagation.
         sequentialHistory.add(new HistoryEntry(
                 0, 0, sequentialInitial, size - sequentialInitial));
 
@@ -187,5 +195,19 @@ public class SimulationHistory {
         System.out.println(
                 "\nSequential and parallel histories match at every step.");
         System.out.println("History consistency checks passed.");
+
+        Path sequentialCsv =
+                outputDirectory.resolve("sequential-history.csv");
+
+        Path parallelCsv =
+                outputDirectory.resolve("parallel-history.csv");
+
+        // Export only after all simulation checks pass.
+        HistoryCsvExporter.write(sequentialCsv, sequentialHistory);
+        HistoryCsvExporter.write(parallelCsv, parallelHistory);
+
+        System.out.println("\nCSV files exported:");
+        System.out.println(sequentialCsv.toAbsolutePath().normalize());
+        System.out.println(parallelCsv.toAbsolutePath().normalize());
     }
 }
