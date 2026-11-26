@@ -129,3 +129,10 @@ History recording occurs on the main thread after a step completes.
 - The expected-history formula applies only to this configured scenario.
 - CSV export is not implemented yet.
 - The program verifies correctness rather than measuring performance.
+## Execution Screenshot
+
+![Sequential and data-parallel simulation history](screenshots/java-simulation-history.png)
+
+Figure 1: Both execution modes produce matching histories for steps
+0–8. All seven computers are compromised by step 6, and steps 7–8
+produce no new compromises.
