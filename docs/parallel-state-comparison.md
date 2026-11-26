@@ -127,3 +127,19 @@ Matching executions do not prove correctness for every possible
 network, input or thread schedule.
 
 These runs do not measure speedup or efficiency.
+## Execution Screenshots
+
+![State comparison with one worker](screenshots/java-state-comparison-1-worker.png)
+
+Figure 1: One worker executes all three scenarios. Totals and individual
+computer states match the sequential baseline.
+
+![State comparison with two workers](screenshots/java-state-comparison-2-workers.png)
+
+Figure 2: Two workers share the scenario tasks. All final totals and
+computer states match the sequential baseline.
+
+![State comparison with three workers](screenshots/java-state-comparison-3-workers.png)
+
+Figure 3: Three workers execute one scenario each. All final totals and
+computer states match the sequential baseline.
