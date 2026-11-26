@@ -93,3 +93,9 @@ throw the error rather than using the `assert` keyword.
 
 These checks cover the sequential Java simulator on a small chain.
 They do not establish parallel thread safety or measure performance.
+## Execution Screenshot
+
+![Java containment and propagation checks](screenshots/java-containment-checks.png)
+
+Figure 1: All four Java checks pass, covering isolated sources,
+isolated targets, protected targets, and one-connection-per-step propagation.
