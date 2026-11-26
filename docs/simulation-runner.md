@@ -221,3 +221,10 @@ CSV output supports later analysis of simulation behaviour.
 - CSV files do not embed configuration metadata.
 - Exports are not written atomically as a pair.
 - This runner does not measure performance or claim a speedup.
+## Execution Screenshots
+
+![Protected ring simulation](screenshots/java-runner-protected-ring.png)
+
+Figure 1: A seven-computer protected ring runs with three workers.
+Sequential and parallel histories match, ending with six compromised
+computers, and CSV export succeeds.
