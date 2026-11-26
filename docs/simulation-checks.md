@@ -11,29 +11,37 @@ Muhammad Hamza Naseer — sequential simulation verification.
 
 ## Purpose
 
-These checks verify containment rules and step-by-step propagation
-before using the sequential simulator as a reference for parallel work.
+These checks verify containment rules, step-by-step propagation,
+and counting when multiple sources attack the same computer.
 
-Each check starts with a fresh three-computer chain:
-
-Computer 1 connects to Computer 2.
-Computer 2 connects to Computer 3.
-
-Only Computer 1 is initially compromised.
+Each check starts with a fresh network.
 
 ## Checks
 
 | Check | Required behaviour |
 |---|---|
-| Isolated source | Computer 1 remains compromised but cannot spread |
-| Isolated target | Computer 2 cannot receive or relay the attack |
-| Protected target | Computer 2 cannot become compromised |
-| One connection per step | Computer 3 becomes compromised in step 2, not step 1 |
+| Isolated source | A compromised isolated computer cannot spread |
+| Isolated target | An isolated healthy computer cannot receive |
+| Protected target | A protected healthy computer cannot become compromised |
+| One connection per step | Newly compromised computers spread only in the next step |
+| Shared target | Multiple sources compromise and count the same target only once |
 
-The blocked-spread checks execute two steps. Both steps must report
-zero new compromises, and only Computer 1 must remain compromised.
+## Blocked-Spread Checks
 
-## Propagation Check
+The first three checks use a three-computer chain:
+
+- Computer 1 connects to Computer 2.
+- Computer 2 connects to Computer 3.
+- Only Computer 1 starts compromised.
+
+Each check applies one defence and executes two steps.
+
+Both steps must report zero new compromises. Only Computer 1
+must remain compromised.
+
+## Step-by-Step Propagation
+
+The fourth check uses the same chain without defence.
 
 | Stage | Computer 1 | Computer 2 | Computer 3 | Newly compromised |
 |---|---|---|---|---:|
@@ -42,19 +50,44 @@ zero new compromises, and only Computer 1 must remain compromised.
 | Step 2 | Compromised | Compromised | Compromised | 1 |
 | Step 3 | Compromised | Compromised | Compromised | 0 |
 
-The check verifies individual computer states, total compromises,
-and the new-compromise count returned by each step.
+The check verifies individual states, total compromises, and the
+new-compromise count returned by each step.
+
+## Multiple Sources and a Shared Target
+
+The fifth check uses four computers:
+
+- Computers 1 and 2 start compromised.
+- Both connect to Computer 3.
+- Computer 4 is disconnected and starts healthy.
+
+| Stage | Compromised computers | Newly compromised |
+|---|---|---:|
+| Initial | 1 and 2 | Not applicable |
+| Step 1 | 1, 2 and 3 | 1 |
+| Step 2 | 1, 2 and 3 | 0 |
+
+Although Computer 3 receives attacks from two sources, it is only
+one newly compromised computer.
+
+Computer 4 must remain healthy in both steps.
 
 ## Connection to the Course
 
-This demonstrates data dependence between simulation steps.
+The propagation check demonstrates data dependence between steps.
 
 The simulator first records pending compromises without changing
-computer states. It applies those changes only after checking the
-whole network.
+computer states. It applies changes after checking the whole network.
+This prevents propagation through several connections in one step.
 
-Therefore, a computer compromised during one step can spread the
-attack only in the following step.
+The shared-target check verifies that the simulator counts distinct
+newly compromised computers rather than the number of incoming attacks.
+
+The boolean pending-compromise array records each target once.
+The application phase counts each marked target once.
+
+This defines expected behaviour for future parallel implementations.
+These sequential checks do not establish thread safety.
 
 ## Compile and Run
 
@@ -81,21 +114,23 @@ PASS: Isolated source cannot spread
 PASS: Isolated target cannot receive
 PASS: Protected target blocks compromise
 PASS: Attack spreads one connection per step
+PASS: Multiple sources count a shared target only once
 
-All 4 containment checks passed.
+All 5 containment checks passed.
 ```
 
-A failed check throws an AssertionError and stops execution.
-The checks do not require Java's `-ea` option because they explicitly
-throw the error rather than using the `assert` keyword.
+A failed check explicitly throws an AssertionError and stops execution.
+Java's `-ea` option is not required.
+
+## Earlier Execution Evidence
+
+![Earlier four Java containment checks](screenshots/java-containment-checks.png)
+
+Figure 1: The earlier four-check version verifies containment and
+one-connection-per-step propagation. This screenshot predates the
+shared-target check.
 
 ## Scope
 
-These checks cover the sequential Java simulator on a small chain.
-They do not establish parallel thread safety or measure performance.
-## Execution Screenshot
-
-![Java containment and propagation checks](screenshots/java-containment-checks.png)
-
-Figure 1: All four Java checks pass, covering isolated sources,
-isolated targets, protected targets, and one-connection-per-step propagation.
+These checks cover small sequential Java simulations.
+They do not measure performance or verify concurrent execution.
