@@ -45,7 +45,6 @@ public class SimulationChecks {
         SequentialSimulator simulator =
                 new SequentialSimulator(network);
 
-        // Before propagation, only Computer 1 is compromised.
         boolean initialCorrect =
                 simulator.getCompromisedCount() == 1
                 && network.getComputer(1).isCompromised()
@@ -57,7 +56,6 @@ public class SimulationChecks {
                     "FAIL: Incorrect initial propagation state");
         }
 
-        // Computer 2 becomes compromised, but cannot spread yet.
         int firstStep = simulator.runStep();
 
         boolean firstStepCorrect = firstStep == 1
@@ -71,7 +69,6 @@ public class SimulationChecks {
                     "FAIL: Step 1 must compromise only Computer 2");
         }
 
-        // Computer 2 can now spread to Computer 3.
         int secondStep = simulator.runStep();
 
         boolean secondStepCorrect = secondStep == 1
@@ -85,7 +82,6 @@ public class SimulationChecks {
                     "FAIL: Step 2 must compromise Computer 3");
         }
 
-        // Once all computers are compromised, no new ones are counted.
         int thirdStep = simulator.runStep();
 
         boolean thirdStepCorrect = thirdStep == 0
@@ -101,6 +97,52 @@ public class SimulationChecks {
 
         System.out.println(
                 "PASS: Attack spreads one connection per step");
+    }
+
+    private static void checkSharedTargetCountedOnce() {
+        Network network = new Network(4);
+
+        // Sources 1 and 2 both connect to target 3.
+        // Computer 4 remains disconnected.
+        network.connect(1, 3);
+        network.connect(2, 3);
+
+        network.getComputer(1).compromise();
+        network.getComputer(2).compromise();
+
+        SequentialSimulator simulator =
+                new SequentialSimulator(network);
+
+        int newlyCompromised = simulator.runStep();
+
+        boolean firstStepCorrect = newlyCompromised == 1
+                && simulator.getCompromisedCount() == 3
+                && network.getComputer(1).isCompromised()
+                && network.getComputer(2).isCompromised()
+                && network.getComputer(3).isCompromised()
+                && !network.getComputer(4).isCompromised();
+
+        if (!firstStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Two sources must count their shared target once");
+        }
+
+        int nextStep = simulator.runStep();
+
+        boolean nextStepCorrect = nextStep == 0
+                && simulator.getCompromisedCount() == 3
+                && network.getComputer(1).isCompromised()
+                && network.getComputer(2).isCompromised()
+                && network.getComputer(3).isCompromised()
+                && !network.getComputer(4).isCompromised();
+
+        if (!nextStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Shared target must not be counted again");
+        }
+
+        System.out.println(
+                "PASS: Multiple sources count a shared target only once");
     }
 
     public static void main(String[] args) {
@@ -125,7 +167,8 @@ public class SimulationChecks {
                 protectedTarget, "Protected target blocks compromise");
 
         checkOneConnectionPerStep();
+        checkSharedTargetCountedOnce();
 
-        System.out.println("\nAll 4 containment checks passed.");
+        System.out.println("\nAll 5 containment checks passed.");
     }
 }
