@@ -190,3 +190,19 @@ A future benchmark must account for this algorithmic difference.
 
 These checks verify the selected scenarios and worker counts.
 They do not prove correctness for every possible network or thread schedule.
+## Execution Screenshots
+
+![Data-parallel simulation with one worker](screenshots/java-data-parallel-1-worker.png)
+
+Figure 1: One worker evaluates all target computers. States and counts
+match sequential execution after every simulation step.
+
+![Data-parallel simulation with two workers](screenshots/java-data-parallel-2-workers.png)
+
+Figure 2: Two workers divide the network into equal target ranges.
+All three scenarios pass step-by-step verification.
+
+![Data-parallel simulation with three workers](screenshots/java-data-parallel-3-workers.png)
+
+Figure 3: Three workers divide 100 computers into ranges of 33, 33 and 34.
+All three scenarios pass step-by-step verification.
