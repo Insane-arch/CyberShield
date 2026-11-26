@@ -215,3 +215,14 @@ CSV export supports later analysis of simulation results.
 - Expected-history checks apply to the configured chain scenario.
 - CSV files do not include topology or execution-environment metadata.
 - The program verifies correctness rather than measuring performance.
+## CSV Export Evidence
+
+![Verified history exported to CSV](screenshots/java-history-csv-export.png)
+
+Figure 2: The simulation verifies both execution histories and reports
+the exported sequential and parallel CSV paths.
+
+![CSV contents and equality check](screenshots/java-history-csv-verification.png)
+
+Figure 3: The CSV contains the header and nine history entries.
+Comparing the complete sequential and parallel files returns True.
