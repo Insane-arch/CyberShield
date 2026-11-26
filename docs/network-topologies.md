@@ -185,3 +185,10 @@ would change the propagation sequence.
 This comparison checks correctness, not performance.
 
 The CUDA implementation still supports chains only.
+## Execution Screenshot
+
+![Chain, ring and star scenario comparison](screenshots/java-network-topology-comparison.png)
+
+Figure 1: All nine topology scenarios pass sequential/data-parallel
+verification. Protecting Computer 4 leaves three compromised computers
+in the chain and six in both the ring and star.
