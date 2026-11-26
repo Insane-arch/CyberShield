@@ -1,4 +1,4 @@
-# Simulation History
+# Simulation History and CSV Export
 
 ## Project Members
 
@@ -7,16 +7,20 @@
 
 ## Work Completed By
 
-Muhammad Hamza Naseer â€” per-step history recording and
-sequential/data-parallel verification.
+Muhammad Hamza Naseer â€” per-step history recording, sequential/
+data-parallel verification and CSV export.
 
 ## Purpose
 
-SimulationHistory records how the network changes after every step,
-rather than showing only a final compromised total.
+SimulationHistory records how a network changes after every step.
 
-It runs separate sequential and data-parallel networks and compares
-their histories and individual computer states.
+It runs separate sequential and data-parallel networks, compares their
+histories and individual states, then exports the verified histories.
+
+## Implementation Files
+
+- `src/cybershield/SimulationHistory.java`
+- `src/cybershield/HistoryCsvExporter.java`
 
 ## Current Configuration
 
@@ -29,33 +33,34 @@ their histories and individual computer states.
 | Defence | None |
 | Data-parallel workers | 3 |
 
-The configuration is currently fixed in the program.
+The simulation configuration is fixed.
+The output directory can be supplied as a command-line argument.
 
 ## History Entries
 
 Each HistoryEntry is an immutable Java record containing:
 
-| Field | Meaning |
-|---|---|
-| step | Simulation step number |
-| newlyCompromised | Computers newly compromised during this step |
-| totalCompromised | Total compromised computers after the step |
-| healthy | Computers that are not compromised |
+| Java field | CSV column | Meaning |
+|---|---|---|
+| step | step | Simulation step number |
+| newlyCompromised | newly_compromised | New compromises during this step |
+| totalCompromised | total_compromised | Total compromises after the step |
+| healthy | healthy | Computers that are not compromised |
 
-Entries store integer values, not references to mutable computer objects.
-Later simulation changes therefore do not alter earlier history entries.
+Entries contain integer values rather than mutable computer references.
+Later simulation changes do not alter earlier entries.
 
 ## Initial State
 
-Step 0 records the network before any propagation occurs.
+Step 0 records the network before propagation.
 
 Computer 1 is already compromised, so the total is one.
-The new-compromise count is zero because no simulation step has run yet.
+The new-compromise count is zero because no step has executed.
 
 ## Expected History
 
 | Step | New | Compromised | Healthy |
-|---:|---:|---:|---:|
+|---|---:|---:|---:|
 | 0 | 0 | 1 | 6 |
 | 1 | 1 | 2 | 5 |
 | 2 | 1 | 3 | 4 |
@@ -67,28 +72,45 @@ The new-compromise count is zero because no simulation step has run yet.
 | 8 | 0 | 7 | 0 |
 
 The attack advances one connection per step.
+After step 6, further steps produce no new compromises.
 
-All computers are compromised after step 6.
-Steps 7 and 8 verify that a completed spread adds no new compromises.
+## Correctness Checks
 
-## Verification
+The program verifies:
 
-The program checks:
-
-- Initial individual states match between execution modes.
-- Individual compromised, isolated and protected states match after every step.
-- Sequential and parallel history entries match.
-- History contains one initial entry plus one entry per simulation step.
-- Step numbers are in order.
+- Matching initial individual computer states.
+- Matching individual states after every step.
+- Matching sequential and parallel history entries.
+- One initial entry plus one entry per simulation step.
+- Ordered step numbers.
 - Compromised plus healthy equals the network size.
-- New-compromise counts and healthy counts are nonnegative.
+- Nonnegative new-compromise and healthy counts.
 - Compromised totals never decrease.
 - Each increase in the total equals that step's new-compromise count.
-- Counts match the independent expectation for the configured chain.
+- Counts match the expected result for this specific chain scenario.
 
-The complete sequential and parallel history lists are also compared.
+Both complete history lists are also compared.
 
-A verification failure throws an AssertionError.
+A failed check throws an AssertionError.
+CSV export begins only after all these checks pass.
+
+## CSV Export Behaviour
+
+HistoryCsvExporter writes UTF-8 files with one header row.
+
+It creates missing parent directories and closes its writer using
+try-with-resources.
+
+The exporter rejects null destinations, null history lists and null
+history entries before opening the output file.
+
+Running the program again replaces the two existing output files.
+Rows are not appended.
+
+The files are written separately, not as one atomic operation.
+If the second export fails, the first file may already have been written.
+
+File-writing failures propagate as IOException.
 
 ## Compile and Run
 
@@ -104,35 +126,92 @@ After successful compilation:
 java -cp out cybershield.SimulationHistory
 ```
 
-Successful execution prints the history table with YES for every row,
-followed by:
+Default output files:
 
 ```text
-Sequential and parallel histories match at every step.
-History consistency checks passed.
+out/history/sequential-history.csv
+out/history/parallel-history.csv
 ```
 
-## Connection to the Course
+The default output directory is inside the ignored out directory.
 
-This feature demonstrates data dependence between simulation steps,
-comparison of sequential and parallel results, and storing results
-after worker completion.
+## Custom Output Directory
 
-Each simulator operates on its own network.
-History recording occurs on the main thread after a step completes.
+Provide one optional directory argument:
 
-## Limitations
+```powershell
+java -cp out cybershield.SimulationHistory "out/history-custom"
+```
 
-- Configuration is fixed to a seven-computer chain without defence.
-- History stores aggregate counts rather than full per-computer snapshots.
-- Individual states are compared during execution but are not retained.
-- The expected-history formula applies only to this configured scenario.
-- CSV export is not implemented yet.
-- The program verifies correctness rather than measuring performance.
-## Execution Screenshot
+Relative paths are resolved from the working directory.
+Paths containing spaces should be quoted.
+
+The output filenames remain sequential-history.csv and
+parallel-history.csv.
+
+## CSV Contents
+
+Both files should contain:
+
+```csv
+step,newly_compromised,total_compromised,healthy
+0,0,1,6
+1,1,2,5
+2,1,3,4
+3,1,4,3
+4,1,5,2
+5,1,6,1
+6,1,7,0
+7,0,7,0
+8,0,7,0
+```
+
+Each file has nine data rows plus its header.
+
+## Inspect and Compare Exports
+
+Display the sequential export:
+
+```powershell
+Get-Content out\history\sequential-history.csv
+```
+
+Compare complete file contents:
+
+```powershell
+$sequentialCsv = Get-Content out\history\sequential-history.csv -Raw
+$parallelCsv = Get-Content out\history\parallel-history.csv -Raw
+$sequentialCsv -eq $parallelCsv
+```
+
+Expected comparison result:
+
+```text
+True
+```
+
+The files can be opened in a spreadsheet application for analysis
+or plotting.
+
+## Earlier Execution Evidence
 
 ![Sequential and data-parallel simulation history](screenshots/java-simulation-history.png)
 
-Figure 1: Both execution modes produce matching histories for steps
-0–8. All seven computers are compromised by step 6, and steps 7–8
-produce no new compromises.
+Figure 1: The earlier history implementation shows matching counts for
+steps 0â€“8. This screenshot predates CSV export.
+
+## Connection to the Course
+
+This feature records results after worker completion and verifies
+data dependence between sequential simulation steps.
+
+CSV export supports later analysis of simulation results.
+
+## Limitations
+
+- Simulation configuration remains fixed.
+- History contains aggregate counts, not full computer-state snapshots.
+- Individual states are compared during execution but are not retained.
+- Expected-history checks apply to the configured chain scenario.
+- CSV files do not include topology or execution-environment metadata.
+- The program verifies correctness rather than measuring performance.
