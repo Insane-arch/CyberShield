@@ -40,6 +40,69 @@ public class SimulationChecks {
         System.out.println("PASS: " + checkName);
     }
 
+    private static void checkOneConnectionPerStep() {
+        Network network = createNetwork();
+        SequentialSimulator simulator =
+                new SequentialSimulator(network);
+
+        // Before propagation, only Computer 1 is compromised.
+        boolean initialCorrect =
+                simulator.getCompromisedCount() == 1
+                && network.getComputer(1).isCompromised()
+                && !network.getComputer(2).isCompromised()
+                && !network.getComputer(3).isCompromised();
+
+        if (!initialCorrect) {
+            throw new AssertionError(
+                    "FAIL: Incorrect initial propagation state");
+        }
+
+        // Computer 2 becomes compromised, but cannot spread yet.
+        int firstStep = simulator.runStep();
+
+        boolean firstStepCorrect = firstStep == 1
+                && simulator.getCompromisedCount() == 2
+                && network.getComputer(1).isCompromised()
+                && network.getComputer(2).isCompromised()
+                && !network.getComputer(3).isCompromised();
+
+        if (!firstStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Step 1 must compromise only Computer 2");
+        }
+
+        // Computer 2 can now spread to Computer 3.
+        int secondStep = simulator.runStep();
+
+        boolean secondStepCorrect = secondStep == 1
+                && simulator.getCompromisedCount() == 3
+                && network.getComputer(1).isCompromised()
+                && network.getComputer(2).isCompromised()
+                && network.getComputer(3).isCompromised();
+
+        if (!secondStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Step 2 must compromise Computer 3");
+        }
+
+        // Once all computers are compromised, no new ones are counted.
+        int thirdStep = simulator.runStep();
+
+        boolean thirdStepCorrect = thirdStep == 0
+                && simulator.getCompromisedCount() == 3
+                && network.getComputer(1).isCompromised()
+                && network.getComputer(2).isCompromised()
+                && network.getComputer(3).isCompromised();
+
+        if (!thirdStepCorrect) {
+            throw new AssertionError(
+                    "FAIL: Completed spread must preserve all states");
+        }
+
+        System.out.println(
+                "PASS: Attack spreads one connection per step");
+    }
+
     public static void main(String[] args) {
         System.out.println("CyberShield - Containment Checks");
         System.out.println("Muhammad Hamza Naseer - 247121");
@@ -61,6 +124,8 @@ public class SimulationChecks {
         checkBlockedSpread(
                 protectedTarget, "Protected target blocks compromise");
 
-        System.out.println("\nAll 3 containment checks passed.");
+        checkOneConnectionPerStep();
+
+        System.out.println("\nAll 4 containment checks passed.");
     }
 }
