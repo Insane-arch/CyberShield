@@ -142,3 +142,10 @@ input or thread schedule.
 
 The demo does not measure speedup, guarantee equal work distribution,
 or provide complete cancellation and failure recovery.
+## Execution Screenshot
+
+![Producer-consumer state comparison](screenshots/java-producer-consumer-states.png)
+
+Figure 1: Two consumers process three scenarios through a queue with
+capacity one. Final totals and individual computer states match
+fresh sequential executions.
