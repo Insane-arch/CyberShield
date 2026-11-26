@@ -139,3 +139,19 @@ Matching these runs does not prove correctness for every possible
 input or thread schedule.
 
 This program does not measure speedup, efficiency or task distribution.
+## Execution Screenshots
+
+![Shared queue comparison with one worker](screenshots/java-queued-states-1-worker.png)
+
+Figure 1: One worker processes the queued scenarios. Final totals and
+individual computer states match sequential execution.
+
+![Shared queue comparison with two workers](screenshots/java-queued-states-2-workers.png)
+
+Figure 2: Two workers retrieve tasks from the shared queue. All scenario
+totals and individual computer states match sequential execution.
+
+![Shared queue comparison with three workers](screenshots/java-queued-states-3-workers.png)
+
+Figure 3: Three workers retrieve tasks from the shared queue. All scenario
+totals and individual computer states match sequential execution.
