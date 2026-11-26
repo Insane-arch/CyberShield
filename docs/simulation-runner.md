@@ -233,3 +233,8 @@ computers, and CSV export succeeds.
 
 Figure 2: Zero steps preserves the initial state and produces only
 the step-zero history entry.
+
+![Invalid worker count rejected](screenshots/java-runner-invalid-workers.png)
+
+Figure 3: Eight workers are rejected for a seven-computer network.
+This is an expected input-validation error.
