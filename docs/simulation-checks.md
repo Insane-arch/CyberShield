@@ -134,3 +134,9 @@ shared-target check.
 
 These checks cover small sequential Java simulations.
 They do not measure performance or verify concurrent execution.
+## Five-Check Execution Evidence
+
+![All five Java containment checks passing](screenshots/java-five-containment-checks.png)
+
+Figure 2: All five checks pass, including verification that multiple
+compromised sources count their shared target only once.
