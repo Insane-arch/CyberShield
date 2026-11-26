@@ -228,3 +228,8 @@ CSV output supports later analysis of simulation behaviour.
 Figure 1: A seven-computer protected ring runs with three workers.
 Sequential and parallel histories match, ending with six compromised
 computers, and CSV export succeeds.
+
+![Zero-step simulation](screenshots/java-runner-zero-steps.png)
+
+Figure 2: Zero steps preserves the initial state and produces only
+the step-zero history entry.
