@@ -165,3 +165,9 @@ These screenshots predate the sixth check.
 
 These checks cover small sequential Java simulations.
 They do not measure performance or verify concurrent execution.
+## Six-Check Execution Evidence
+
+![All six Java containment checks passing](screenshots/java-six-containment-checks.png)
+
+Figure 3: All six checks pass, including verification that protection
+does not cure an already compromised source or prevent its spread.
