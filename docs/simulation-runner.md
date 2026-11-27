@@ -297,3 +297,11 @@ compromised computers and one healthy computer.
 The protected-ring execution using reusable workers exports seven
 history entries, covering steps 0–6. The final entry records zero
 new compromises, six compromised computers and one healthy computer.
+
+## Execution Mode CSV Comparison
+
+![Comparison of per-step and pooled CSV histories](screenshots/java-runner-mode-csv-comparison.png)
+
+Comparing the complete protected-ring CSV histories returns True.
+Per-step threads and reusable pooled workers export identical aggregate
+history values for this configuration.
