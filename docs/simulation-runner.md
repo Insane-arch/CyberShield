@@ -7,20 +7,26 @@
 
 ## Work Completed By
 
-Muhammad Hamza Naseer — configurable Java execution, state comparison
-and history export.
+Muhammad Hamza Naseer — configurable Java execution, parallel-mode
+selection, state comparison and CSV history export.
 
 ## Purpose
 
-SimulationRunner allows simulation settings to be selected from the
-command line without editing source code.
+SimulationRunner accepts simulation settings from the command line.
 
-Each run executes separate sequential and data-parallel networks,
-compares their states and histories, then exports both histories to CSV.
+Each run executes separate sequential and parallel networks,
+compares their states and histories, and exports both histories.
+
+Two parallel modes are available:
+
+| Mode | Selection | Worker lifecycle |
+|---|---|---|
+| Per-step threads | Default | Creates new threads each step |
+| Reusable thread pool | Add --pooled last | Reuses pool threads across steps |
+
+Both modes process target ranges within one network.
 
 ## Compile
-
-From the project directory:
 
 ```powershell
 javac -d out src\cybershield\*.java
@@ -29,11 +35,13 @@ javac -d out src\cybershield\*.java
 ## Command Format
 
 ```text
-java -cp out cybershield.SimulationRunner <topology> <computers> <steps> <defence> <workers> [output-directory]
+java -cp out cybershield.SimulationRunner <topology> <computers> <steps> <defence> <workers> [output-directory] [--pooled]
 ```
 
 The first five arguments are required.
+
 The output directory is optional.
+If supplied, --pooled must be the final argument.
 
 Display help:
 
@@ -51,89 +59,107 @@ java -cp out cybershield.SimulationRunner --help
 | defence | none, isolate, protect |
 | workers | 1–min(computers, 32) |
 | output-directory | Optional filesystem directory |
+| --pooled | Optional final flag selecting reusable workers |
 
 Topology and defence names are case-insensitive.
+The --pooled flag must use the spelling shown.
 
-Invalid numeric input, out-of-range values, unknown options and
-incorrect argument counts cause an error.
+Unknown or misplaced double-dash options are rejected.
 
-These bounds are practical limits for the current implementation.
-They are not hardware limits.
+Invalid numbers, out-of-range values and incorrect argument counts
+produce errors.
+
+These bounds are practical application limits, not hardware limits.
 
 ## Scenario Rules
 
 Computer 1 starts compromised in every run.
 
-| Defence | Behaviour |
+| Defence | Action |
 |---|---|
-| none | No defensive flags applied |
+| none | Apply no defence |
 | isolate | Isolate Computer 1 |
 | protect | Protect Computer computers / 2 + 1 |
 
 The protection target uses integer division.
 
-In the star topology, Computer 1 is the central hub.
+Computer 1 is the hub in the star topology.
 
 Protection blocks new compromise. Isolation blocks sending and receiving.
-Neither operation cures an existing compromise.
+Neither cures an existing compromise.
 
 ## Execution and Verification
 
-The runner creates separate networks for sequential and data-parallel
-execution using identical settings.
+The runner creates separate sequential and parallel networks with
+identical settings.
 
-Step 0 records initial states without executing propagation.
+Step 0 records the initial state without propagation.
 
-After each step, the runner compares:
+At each recorded step, it compares:
 
-- Individual computer IDs and state flags.
+- Computer IDs and individual state flags.
 - Newly compromised counts.
 - Total compromised counts.
 - Healthy counts.
 
-It also checks that history counts are within valid bounds and that
-the increase in the total equals the new-compromise count.
+It also checks count bounds and verifies that each increase in total
+compromises equals the new-compromise count.
 
 A mismatch causes an AssertionError.
 
-Matching the two implementations is a consistency check, not independent
-proof that both are correct. Known scenario checks provide additional
-verification elsewhere in the project.
+Matching implementations provide a consistency check. Separate known
+scenario checks provide additional verification.
 
-## Example Runs
+## Pooled Resource Lifecycle
 
-### Protected Chain
+Pooled mode uses try-with-resources.
 
-```powershell
-java -cp out cybershield.SimulationRunner chain 7 6 protect 3
+The pool is closed after simulation, including when execution throws.
+On successful completion, closure occurs before printing results and
+exporting CSV files.
+
+A zero-step pooled run also closes its executor. No propagation tasks
+are submitted in that case.
+
+Successful pooled execution reports:
+
+```text
+Simulation pool closed.
 ```
 
-Expected final totals: 3 compromised, 4 healthy.
+## Example Commands
 
-### Protected Ring
+### Default Per-Step Threads
 
 ```powershell
 java -cp out cybershield.SimulationRunner ring 7 6 protect 3
 ```
 
-Expected final totals: 6 compromised, 1 healthy.
-
-### Unprotected Star
+### Reusable Workers
 
 ```powershell
-java -cp out cybershield.SimulationRunner star 7 1 none 2
+java -cp out cybershield.SimulationRunner ring 7 6 protect 3 --pooled
 ```
 
-Expected final totals: 7 compromised, 0 healthy.
+Both ring commands should finish with six compromised computers
+and one healthy computer.
 
-### Zero Steps
+### Zero Steps with Pooled Mode
 
 ```powershell
-java -cp out cybershield.SimulationRunner chain 7 0 none 3
+java -cp out cybershield.SimulationRunner chain 7 0 none 3 --pooled
 ```
 
-Expected final totals: 1 compromised, 6 healthy.
-Only the initial history row is produced.
+Expected: one compromised computer, six healthy computers and only
+the step-zero history entry.
+
+### Custom Output Directory
+
+```powershell
+java -cp out cybershield.SimulationRunner ring 7 6 protect 3 "out/custom history" --pooled
+```
+
+Quote paths containing spaces.
 
 ### Invalid Worker Count
 
@@ -141,38 +167,39 @@ Only the initial history row is produced.
 java -cp out cybershield.SimulationRunner chain 7 6 none 8
 ```
 
-This must fail because the worker count exceeds the network size.
+This is rejected because eight workers exceed the seven-computer size.
 
 ## Successful Output
 
-The program prints configuration details and a history table.
+The program prints configuration details, selected parallel mode
+and the history table.
 
-After verification succeeds, it prints:
+Successful verification reports:
 
 ```text
 All sequential and parallel states and histories match.
 ```
 
-It then exports the CSV files and prints their paths.
+After exporting both files, their paths are printed.
 
-A file-writing failure may occur after successful simulation verification.
-Successful verification alone does not establish that export succeeded.
+A successful simulation check does not guarantee successful file export.
+An export failure propagates as IOException.
 
-## CSV Output
+## Default CSV Directories
 
-Default directory format:
+Per-step mode preserves the existing directory format:
 
 ```text
 out/history/<topology>-n<computers>-s<steps>-<defence>-w<workers>/
 ```
 
-For example:
+Pooled mode adds a suffix:
 
 ```text
-out/history/ring-n7-s6-protect-w3/
+out/history/<topology>-n<computers>-s<steps>-<defence>-w<workers>-pooled/
 ```
 
-Each directory contains:
+Both directories contain:
 
 ```text
 sequential-history.csv
@@ -185,56 +212,65 @@ Columns:
 step,newly_compromised,total_compromised,healthy
 ```
 
-Each file contains one header and steps + 1 data rows.
+Each file has one header and steps + 1 data rows.
 
-Different configurations use different default directories.
-Repeating the same configuration replaces its previous exports.
+Repeating a configuration replaces its existing files.
 
-The default output is inside the ignored out directory.
+Default directories separate the two modes. An explicitly supplied
+custom directory is used as given; reusing it overwrites its fixed
+filenames regardless of execution mode.
 
-## Custom Output Directory
+## Compare Exported Modes
+
+After running both protected-ring commands:
 
 ```powershell
-java -cp out cybershield.SimulationRunner ring 7 6 protect 3 "out/custom history"
+$perStepHistory = Get-Content out\history\ring-n7-s6-protect-w3\parallel-history.csv -Raw
+$pooledHistory = Get-Content out\history\ring-n7-s6-protect-w3-pooled\parallel-history.csv -Raw
+$perStepHistory -eq $pooledHistory
 ```
 
-Quote paths containing spaces.
+Expected result:
 
-Both filenames remain fixed. Reusing a custom directory replaces
-its previous sequential and parallel history files, even if the
-simulation configuration has changed.
+```text
+True
+```
 
-## Connection to the Course
+This compares exported aggregate histories. Individual computer states
+are checked against the sequential baseline inside each execution.
 
-This combines parallel-program design, data parallelism, synchronization,
-network topology and sequential/parallel correctness comparison.
-
-CSV output supports later analysis of simulation behaviour.
-
-## Limitations
-
-- The initial compromised computer is fixed to Computer 1.
-- Defence targets are selected by the scenario rules.
-- The data-parallel simulator creates new worker threads for each step.
-- Network connections use an adjacency matrix.
-- The program prints every history row.
-- CSV files do not embed configuration metadata.
-- Exports are not written atomically as a pair.
-- This runner does not measure performance or claim a speedup.
-## Execution Screenshots
+## Earlier Execution Evidence
 
 ![Protected ring simulation](screenshots/java-runner-protected-ring.png)
 
-Figure 1: A seven-computer protected ring runs with three workers.
-Sequential and parallel histories match, ending with six compromised
-computers, and CSV export succeeds.
+Figure 1: The original runner executes a protected ring and exports
+matching histories.
 
 ![Zero-step simulation](screenshots/java-runner-zero-steps.png)
 
-Figure 2: Zero steps preserves the initial state and produces only
-the step-zero history entry.
+Figure 2: The original runner preserves initial states with zero steps.
 
 ![Invalid worker count rejected](screenshots/java-runner-invalid-workers.png)
 
-Figure 3: Eight workers are rejected for a seven-computer network.
-This is an expected input-validation error.
+Figure 3: An invalid worker count is rejected.
+
+These screenshots predate pooled-mode integration.
+
+## Connection to the Course
+
+The runner demonstrates parallel-program design, data parallelism,
+synchronization, worker lifecycle management and correctness comparison.
+
+## Limitations
+
+- Computer 1 is always the initial compromised source.
+- Defence targets follow fixed scenario rules.
+- Connections use an adjacency matrix.
+- Every history row is printed.
+- CSV files do not embed configuration metadata.
+- CSV exports are not atomic as a pair.
+- This runner does not measure performance.
+- Thread reuse has not yet demonstrated a measured speedup.
+
+See [reusable worker implementation](pooled-data-parallel.md)
+for pool behaviour and failure handling.
