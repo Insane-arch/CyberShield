@@ -281,3 +281,11 @@ for pool behaviour and failure handling.
 Figure 4: Three reusable workers simulate the protected ring.
 Sequential and pooled histories match, the pool closes, and CSV files
 are exported to the pooled-mode directory.
+
+## Per-Step Thread CSV Evidence
+
+![History exported by per-step threads](screenshots/java-runner-per-step-csv.png)
+
+The protected-ring execution using per-step threads exports seven
+history entries, covering steps 0–6. The final entry records six
+compromised computers and one healthy computer.
