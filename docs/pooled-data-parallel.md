@@ -202,3 +202,9 @@ Pooled execution has not yet been integrated into that runner.
 - Dedicated injected-failure and interruption checks are not included.
 - Worker tasks still allocate fresh task objects and pending arrays per step.
 - Network connections still use an adjacency matrix.
+## Execution Screenshots
+
+![Pooled comparison with one worker](screenshots/java-pooled-comparison-1-worker.png)
+
+Figure 1: One reusable worker processes each network across eight steps.
+All nine scenarios match sequential execution, and all pools close.
