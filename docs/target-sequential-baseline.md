@@ -145,3 +145,10 @@ It does not provide synchronization for concurrent callers.
 - No sequential-versus-pooled speedup has been established yet.
 - The configurable runner still uses the original source-first simulator
   as its sequential correctness reference.
+## Execution Screenshot
+
+![Source-first and target-first sequential comparison](screenshots/java-target-sequential-comparison.png)
+
+Figure 1: Both sequential algorithms produce matching states and counts
+after every step in all nine chain, ring and star scenarios.
+Final totals also match the known expected values.
