@@ -74,6 +74,7 @@ public class SimulationRunner {
                     || expected.isCompromised() != actual.isCompromised()
                     || expected.isIsolated() != actual.isIsolated()
                     || expected.isProtected() != actual.isProtected()) {
+
                 throw new AssertionError(
                         "State mismatch at step " + step
                         + ", Computer " + id);
@@ -90,6 +91,7 @@ public class SimulationRunner {
                 || total > size
                 || (step == 0 && newlyCompromised != 0)
                 || (step > 0 && total - previousTotal != newlyCompromised)) {
+
             throw new AssertionError(
                     "Invalid history counts at step " + step);
         }
@@ -102,12 +104,14 @@ public class SimulationRunner {
         System.out.println(
                 "Usage: java -cp out cybershield.SimulationRunner"
                 + " <topology> <computers> <steps> <defence> <workers>"
-                + " [output-directory]");
+                + " [output-directory] [--pooled]");
         System.out.println("Topology: chain | ring | star");
         System.out.println("Defence: none | isolate | protect");
         System.out.println(
+                "--pooled must be last; omit it for per-step threads.");
+        System.out.println(
                 "Example: java -cp out cybershield.SimulationRunner"
-                + " ring 7 6 protect 3");
+                + " ring 7 6 protect 3 --pooled");
     }
 
     public static void main(String[] args)
@@ -118,11 +122,25 @@ public class SimulationRunner {
             return;
         }
 
-        if (args.length < 5 || args.length > 6) {
+        boolean usePool =
+                args.length > 0 && args[args.length - 1].equals("--pooled");
+
+        int positionalCount = args.length - (usePool ? 1 : 0);
+
+        if (positionalCount < 5 || positionalCount > 6) {
             printUsage();
             throw new IllegalArgumentException(
-                    "Provide five configuration arguments"
-                    + " and an optional output directory.");
+                    "Provide five configuration arguments,"
+                    + " an optional output directory,"
+                    + " and optionally --pooled last.");
+        }
+
+        // Avoid treating an unknown or misplaced flag as a directory.
+        for (int i = 0; i < positionalCount; i++) {
+            if (args[i].startsWith("--")) {
+                throw new IllegalArgumentException(
+                        "Unknown or misplaced option: " + args[i]);
+            }
         }
 
         String topology = args[0].toLowerCase(Locale.ROOT);
@@ -136,7 +154,11 @@ public class SimulationRunner {
         String runName = topology + "-n" + size
                 + "-s" + steps + "-" + defence + "-w" + workers;
 
-        Path outputDirectory = args.length == 6
+        if (usePool) {
+            runName += "-pooled";
+        }
+
+        Path outputDirectory = positionalCount == 6
                 ? Path.of(args[5])
                 : Path.of("out", "history", runName);
 
@@ -147,46 +169,66 @@ public class SimulationRunner {
 
         SequentialSimulator sequential =
                 new SequentialSimulator(sequentialNetwork);
-        DataParallelSimulator parallel =
-                new DataParallelSimulator(parallelNetwork, workers);
+
+        DataParallelSimulator perStep = usePool
+                ? null
+                : new DataParallelSimulator(parallelNetwork, workers);
 
         List<SimulationHistory.HistoryEntry> sequentialHistory =
                 new ArrayList<>();
         List<SimulationHistory.HistoryEntry> parallelHistory =
                 new ArrayList<>();
 
-        int previousSequential = sequential.getCompromisedCount();
-        int previousParallel = parallel.getCompromisedCount();
+        // A null resource is allowed; only pooled mode needs closing.
+        try (PooledDataParallelSimulator pooled = usePool
+                ? new PooledDataParallelSimulator(parallelNetwork, workers)
+                : null) {
 
-        for (int step = 0; step <= steps; step++) {
-            int sequentialNew = step == 0 ? 0 : sequential.runStep();
-            int parallelNew = step == 0 ? 0 : parallel.runStep();
+            int previousSequential = sequential.getCompromisedCount();
+            int previousParallel = usePool
+                    ? pooled.getCompromisedCount()
+                    : perStep.getCompromisedCount();
 
-            int sequentialTotal = sequential.getCompromisedCount();
-            int parallelTotal = parallel.getCompromisedCount();
+            for (int step = 0; step <= steps; step++) {
+                int sequentialNew = 0;
+                int parallelNew = 0;
 
-            SimulationHistory.HistoryEntry sequentialEntry =
-                    createEntry(step, sequentialNew, sequentialTotal,
-                            size, previousSequential);
+                if (step > 0) {
+                    sequentialNew = sequential.runStep();
+                    parallelNew = usePool
+                            ? pooled.runStep()
+                            : perStep.runStep();
+                }
 
-            SimulationHistory.HistoryEntry parallelEntry =
-                    createEntry(step, parallelNew, parallelTotal,
-                            size, previousParallel);
+                int sequentialTotal = sequential.getCompromisedCount();
+                int parallelTotal = usePool
+                        ? pooled.getCompromisedCount()
+                        : perStep.getCompromisedCount();
 
-            verifyStates(sequentialNetwork, parallelNetwork, step);
+                SimulationHistory.HistoryEntry sequentialEntry =
+                        createEntry(step, sequentialNew, sequentialTotal,
+                                size, previousSequential);
 
-            if (!sequentialEntry.equals(parallelEntry)) {
-                throw new AssertionError(
-                        "History mismatch at step " + step);
+                SimulationHistory.HistoryEntry parallelEntry =
+                        createEntry(step, parallelNew, parallelTotal,
+                                size, previousParallel);
+
+                verifyStates(sequentialNetwork, parallelNetwork, step);
+
+                if (!sequentialEntry.equals(parallelEntry)) {
+                    throw new AssertionError(
+                            "History mismatch at step " + step);
+                }
+
+                sequentialHistory.add(sequentialEntry);
+                parallelHistory.add(parallelEntry);
+
+                previousSequential = sequentialTotal;
+                previousParallel = parallelTotal;
             }
-
-            sequentialHistory.add(sequentialEntry);
-            parallelHistory.add(parallelEntry);
-
-            previousSequential = sequentialTotal;
-            previousParallel = parallelTotal;
         }
 
+        // Pooled resources are closed before printing and exporting.
         System.out.println("CyberShield - Configurable Simulation");
         System.out.println("Muhammad Hamza Naseer - 247121");
         System.out.println("Sultan Majeed - 247187");
@@ -196,6 +238,8 @@ public class SimulationRunner {
         System.out.println("Steps: " + steps);
         System.out.println("Defence: " + defence);
         System.out.println("Workers: " + workers);
+        System.out.println("Parallel mode: "
+                + (usePool ? "Reusable thread pool" : "Per-step threads"));
         System.out.println("Initially compromised: Computer 1");
 
         if (scenario == NetworkFactory.ISOLATION) {
@@ -218,6 +262,10 @@ public class SimulationRunner {
 
         System.out.println(
                 "\nAll sequential and parallel states and histories match.");
+
+        if (usePool) {
+            System.out.println("Simulation pool closed.");
+        }
 
         Path sequentialCsv =
                 outputDirectory.resolve("sequential-history.csv");
