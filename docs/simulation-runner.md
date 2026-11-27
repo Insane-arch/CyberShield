@@ -274,3 +274,10 @@ synchronization, worker lifecycle management and correctness comparison.
 
 See [reusable worker implementation](pooled-data-parallel.md)
 for pool behaviour and failure handling.
+## Pooled Execution Evidence
+
+![Protected ring using pooled workers](screenshots/java-runner-pooled-ring.png)
+
+Figure 4: Three reusable workers simulate the protected ring.
+Sequential and pooled histories match, the pool closes, and CSV files
+are exported to the pooled-mode directory.
