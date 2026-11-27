@@ -154,3 +154,10 @@ Accepted ranges:
 The exact execution environment and power/background conditions
 were not captured in this result record. Earlier laptop benchmark
 specifications must not automatically be attributed to these measurements.
+## Execution Screenshot
+
+![Thread reuse benchmark results](screenshots/java-thread-reuse-benchmark.png)
+
+Figure 1: For 100 computers, 99 steps and three workers, the recorded
+mean times are 17.628 ms for per-step threads and 2.659 ms for pooled
+workers. The time ratio is 6.63x, and all results pass verification.
