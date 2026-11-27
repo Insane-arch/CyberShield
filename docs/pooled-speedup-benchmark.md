@@ -181,3 +181,10 @@ Accepted ranges:
 - The benchmark checks final states and accumulated new compromises,
   rather than retaining every intermediate state.
 - Larger workloads or other worker counts may behave differently.
+## Execution Screenshot
+
+![Sequential versus pooled benchmark](screenshots/java-pooled-speedup-500-499-3.png)
+
+Figure 1: For 500 computers, 499 steps and three workers, mean sequential
+time is 29.550 ms and mean pooled time is 30.007 ms. Reported speedup
+is 0.98x and efficiency is 32.83%. All verification checks pass.
