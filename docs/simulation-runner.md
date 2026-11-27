@@ -289,3 +289,11 @@ are exported to the pooled-mode directory.
 The protected-ring execution using per-step threads exports seven
 history entries, covering steps 0–6. The final entry records six
 compromised computers and one healthy computer.
+
+## Pooled Worker CSV Evidence
+
+![History exported by pooled workers](screenshots/java-runner-pooled-csv.png)
+
+The protected-ring execution using reusable workers exports seven
+history entries, covering steps 0–6. The final entry records zero
+new compromises, six compromised computers and one healthy computer.
