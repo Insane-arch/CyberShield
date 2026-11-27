@@ -208,3 +208,9 @@ Pooled execution has not yet been integrated into that runner.
 
 Figure 1: One reusable worker processes each network across eight steps.
 All nine scenarios match sequential execution, and all pools close.
+
+![Pooled comparison with three workers](screenshots/java-pooled-comparison-3-workers.png)
+
+Figure 2: Three reusable workers process target ranges containing
+two, two and three computers. All nine scenarios match sequential
+execution at every step, and all pools close.
